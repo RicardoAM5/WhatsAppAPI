@@ -3,62 +3,61 @@ package WhatsApp.MetaApi.WhatsAppServices;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Scanner;
-import java.io.IOException;
 
 @Service
 public class SendWhatsApp {
 
-    //Token
+    // Meta token retrieved from configuration
     @Value("${meta.token}")
     String token;
-    //Phone to send the message
 
-
+    // WhatsApp ID number retrieved from configuration
     @Value("${meta.idNumber}")
     String idNumber;
 
+    // Method to send a WhatsApp message
     public void sendWhatsAppMessage(String phoneNumber) {
         try {
-            //URL
+            // Construct URL for WhatsApp message sending
             URL url = new URL("https://graph.facebook.com/v15.0/" + idNumber + "/messages");
-            //Open Connection
+            // Open connection
             HttpURLConnection httpConnection = (HttpURLConnection) url.openConnection();
             httpConnection.setRequestMethod("POST");
-            //Use token
+            // Set authorization header with token
             httpConnection.setRequestProperty("Authorization", "Bearer " + token);
-            //Send message as JSON
-            httpConnection.setRequestProperty("Content-Type", "application/json; application/x-www-form-urlencoded; charset=UTF-8");
+            // Set content type and allow output
+            httpConnection.setRequestProperty("Content-Type", "application/json");
             httpConnection.setDoOutput(true);
-            //Create message
-            OutputStreamWriter writer = new OutputStreamWriter(httpConnection.getOutputStream());
-            writer.write("{ "
+
+            // Construct the JSON message to be sent
+            String message = "{ "
                     + "\"messaging_product\": \"whatsapp\", "
                     + "\"to\": \"" + phoneNumber + "\", "
                     + "\"type\": \"template\", "
-                    + "\"template\": "
-                    + "  { \"name\": \"hello_world\", "
-                    + "    \"language\": { \"code\": \"en_US\" } "
-                    + "  } "
-                    + "}");
-            //Clean data
-            writer.flush();
-            //Close connection
-            writer.close();
-            httpConnection.getOutputStream().close();
+                    + "\"template\": { \"name\": \"hello_world\", \"language\": { \"code\": \"en_US\" } } "
+                    + "}";
 
-            InputStream responseStream = httpConnection.getResponseCode() / 100 == 2
+            // Write the message to the connection output stream
+            try (OutputStreamWriter writer = new OutputStreamWriter(httpConnection.getOutputStream())) {
+                writer.write(message);
+            }
+
+            // Read response from the connection
+            InputStream responseStream = (httpConnection.getResponseCode() / 100 == 2)
                     ? httpConnection.getInputStream()
                     : httpConnection.getErrorStream();
-            Scanner s = new Scanner(responseStream).useDelimiter("\\A");
-            String respuesta = s.hasNext() ? s.next() : "";
 
-            System.out.println(respuesta);
+            // Process the response
+            String response = new Scanner(responseStream, "UTF-8").useDelimiter("\\A").next();
+            System.out.println(response);
         } catch (IOException e) {
+            // Handle any I/O exceptions
             e.printStackTrace();
         }
     }
