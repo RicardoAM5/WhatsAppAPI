@@ -3,37 +3,38 @@ package WhatsApp.MetaApi.WhatsAppServices;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Scanner;
 
 @Service
 public class SendWhatsApp {
 
     // Meta token retrieved from configuration
     @Value("${meta.token}")
-    String token;
+    private String token;
 
     // WhatsApp ID number retrieved from configuration
     @Value("${meta.idNumber}")
-    String idNumber;
+    private String idNumber;
 
     // Method to send a WhatsApp message
     public void sendWhatsAppMessage(String phoneNumber) {
         try {
-            // Construct URL for WhatsApp message sending
-            URL url = new URL("https://graph.facebook.com/v15.0/" + idNumber + "/messages");
-            // Open connection
-            HttpURLConnection httpConnection = (HttpURLConnection) url.openConnection();
-            httpConnection.setRequestMethod("POST");
+            // Construct the URL for sending WhatsApp message
+            String urlStr = "https://graph.facebook.com/v15.0/" + idNumber + "/messages";
+            URL url = new URL(urlStr);
+
+            // Open connection to the URL
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            // Set request method to POST
+            connection.setRequestMethod("POST");
             // Set authorization header with token
-            httpConnection.setRequestProperty("Authorization", "Bearer " + token);
-            // Set content type and allow output
-            httpConnection.setRequestProperty("Content-Type", "application/json");
-            httpConnection.setDoOutput(true);
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            // Set content type
+            connection.setRequestProperty("Content-Type", "application/json");
+            // Allow output
+            connection.setDoOutput(true);
 
             // Construct the JSON message to be sent
             String message = "{ "
@@ -44,20 +45,31 @@ public class SendWhatsApp {
                     + "}";
 
             // Write the message to the connection output stream
-            try (OutputStreamWriter writer = new OutputStreamWriter(httpConnection.getOutputStream())) {
+            try (OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream())) {
                 writer.write(message);
             }
 
-            // Read response from the connection
-            InputStream responseStream = (httpConnection.getResponseCode() / 100 == 2)
-                    ? httpConnection.getInputStream()
-                    : httpConnection.getErrorStream();
+            // Get the response code
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // If response is OK (200), read the response message
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                    // Print success message and response body
+                    System.out.println("Message sent successfully!");
+                    System.out.println("Response: " + response.toString());
+                }
+            } else {
+                // If response code is not OK, print error message
+                System.err.println("Failed to send message! Response code: " + responseCode);
+            }
 
-            // Process the response
-            String response = new Scanner(responseStream, "UTF-8").useDelimiter("\\A").next();
-            System.out.println(response);
         } catch (IOException e) {
-            // Handle any I/O exceptions
+            // Catch any I/O exceptions and print stack trace
             e.printStackTrace();
         }
     }
